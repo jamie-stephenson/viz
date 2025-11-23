@@ -1,0 +1,25 @@
+[project]
+name = "viz"
+version = "0.1.0"
+description = "A collection of small interactive math visualizations"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dash",
+    "plotly",
+    "numpy",
+]
+
+[project.scripts]
+maxvis = "apps.maxvis.app:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["apps*"]
+
+[tool.uv]
+package = true

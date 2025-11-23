@@ -1,0 +1,12 @@
+
+body, div, span, p, h1, h2, h3, h4, button, label {
+  font-family: 'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif;
+  color: #111;
+}
+
+
+.rc-slider-mark-text { display: none !important; }
+.rc-slider-tooltip { display: none !important; }
+
+
+.dash-debug-menu, .dash-debug-alert { display: none !important; }
