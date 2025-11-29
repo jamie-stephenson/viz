@@ -3,7 +3,7 @@
 A collection of small vibe-coded visualizations. Each visualization lives in its own subdirectory under `apps/` and can be run via `uv run <name>`.
 
 Currently included
-- `maxvis`: Softmax vs [Sparsemax](https://arxiv.org/abs/1602.02068) vs [Entmax](https://arxiv.org/abs/1905.05702) in 3D — adjust a 3D logit vector and see softmax(z), [sparsemax](https://arxiv.org/abs/1602.02068)(z), [entmax](https://arxiv.org/abs/1905.05702) (z) on the probability simplex, with the raw z point in 3D.
+- `maxvis`: Softmax vs [Sparsemax](https://arxiv.org/abs/1602.02068) vs [Entmax](https://arxiv.org/abs/1905.05702) in 3D — adjust a 3D logit vector and see softmax(z), sparsemax(z), entmax(z) on the probability simplex, with the raw z point in 3D.
 - `hardconcrete`: [HardConcrete](https://arxiv.org/abs/1712.01312) gate sampling — interactively explore the stages (u, s, z̄, z) with a slider over log(alpha) and see distributions update live.
 
 Run with uv
