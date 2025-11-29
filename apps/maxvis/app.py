@@ -3,7 +3,7 @@ from typing import List, Tuple
 import numpy as np
 from dash import Dash, html, dcc, Input, Output, State, ctx
 import plotly.graph_objects as go
-from .sparsemax import softmax, sparsemax
+from .sparsemax import softmax, sparsemax, entmax_alpha
 DEFAULT_Z = np.array([1.0, 0.0, -1.0], dtype=float)
 SLIDER_MIN = -5.0
 SLIDER_MAX = 5.0
@@ -19,6 +19,10 @@ def make_simplex_mesh() -> List[go.BaseTraceType]:
     mesh = go.Mesh3d(x=xs, y=ys, z=zs, i=[0], j=[1], k=[2], color='lightblue', opacity=0.25, name='Simplex', hoverinfo='skip', showscale=False, showlegend=False)
     edges = go.Scatter3d(x=[v1[0], v2[0], v3[0], v1[0]], y=[v1[1], v2[1], v3[1], v1[1]], z=[v1[2], v2[2], v3[2], v1[2]], mode='lines', line=dict(color='#888', width=5), name='Simplex edges', hoverinfo='skip', showlegend=False)
     return [mesh, edges]
+
+# Use a denser set of α values for a smoother α-entmax path
+# 1.0 → 2.0 inclusive with step ≈ 0.05 (21 points)
+ENTMAX_ALPHAS = [float(a) for a in np.linspace(1.0, 2.0, 21)]
 
 def make_figure(z: np.ndarray) -> go.Figure:
     z = np.asarray(z, dtype=float)
@@ -36,14 +40,103 @@ def make_figure(z: np.ndarray) -> go.Figure:
     axis_y = go.Scatter3d(x=[0, 0], y=[axis_min, axis_max], z=[0, 0], mode='lines', line=dict(color='#000', width=3), name='axis p2', hoverinfo='skip', showlegend=False)
     axis_z = go.Scatter3d(x=[0, 0], y=[0, 0], z=[axis_min, axis_max], mode='lines', line=dict(color='#000', width=3), name='axis p3', hoverinfo='skip', showlegend=False)
     traces.extend([axis_x, axis_y, axis_z])
-    line = go.Scatter3d(x=[p_soft[0], p_sparse[0]], y=[p_soft[1], p_sparse[1]], z=[p_soft[2], p_sparse[2]], mode='lines', line=dict(color='#6a5acd', width=6), name='softmax ↔ sparsemax', showlegend=True, hovertemplate='<b>Δ path</b><extra></extra>')
+    # Build entmax path from alpha=1 (softmax) to alpha=2 (sparsemax)
+    ent_points = [entmax_alpha(z, a) for a in ENTMAX_ALPHAS]
+    xs = [float(p[0]) for p in ent_points]
+    ys = [float(p[1]) for p in ent_points]
+    zs = [float(p[2]) for p in ent_points]
+    line = go.Scatter3d(
+        x=xs,
+        y=ys,
+        z=zs,
+        mode='lines',
+        line=dict(color='#6a5acd', width=6),
+        name='α-entmax path (1 → 2)',
+        showlegend=True,
+        hovertemplate='<b>α-entmax path</b><extra></extra>'
+    )
+    # Intermediate α markers (exclude endpoints at α=1,2)
+    if len(ENTMAX_ALPHAS) > 2:
+        mid_points = ent_points[1:-1]
+        mid_alphas = ENTMAX_ALPHAS[1:-1]
+        mid_x = [float(p[0]) for p in mid_points]
+        mid_y = [float(p[1]) for p in mid_points]
+        mid_z = [float(p[2]) for p in mid_points]
+        mid_text = [f'α={a:g}' for a in mid_alphas]
+        ent_markers = go.Scatter3d(
+            x=mid_x,
+            y=mid_y,
+            z=mid_z,
+            mode='markers',
+            marker=dict(size=5, color='#6a5acd'),
+            name='α-entmax points',
+            text=mid_text,
+            hovertemplate='%{text}<br>p1=%{x:.3f}<br>p2=%{y:.3f}<br>p3=%{z:.3f}<extra></extra>'
+        )
+    else:
+        ent_markers = None
     soft_pt = go.Scatter3d(x=[p_soft[0]], y=[p_soft[1]], z=[p_soft[2]], mode='markers', marker=dict(size=7, color='#1f77b4'), name='softmax(z)', hovertemplate='softmax(z)<br>p1=%{x:.3f}<br>p2=%{y:.3f}<br>p3=%{z:.3f}<extra></extra>')
     sparse_pt = go.Scatter3d(x=[p_sparse[0]], y=[p_sparse[1]], z=[p_sparse[2]], mode='markers', marker=dict(size=9, color='#d62728', symbol='diamond'), name='sparsemax(z)', hovertemplate='sparsemax(z)<br>p1=%{x:.3f}<br>p2=%{y:.3f}<br>p3=%{z:.3f}<extra></extra>')
     z_pt = go.Scatter3d(x=[z[0]], y=[z[1]], z=[z[2]], mode='markers', marker=dict(size=8, color='#000000', symbol='square-open'), name='z', hovertemplate='z (raw)<br>z1=%{x:.3f}<br>z2=%{y:.3f}<br>z3=%{z:.3f}<extra></extra>')
-    traces.extend([line, soft_pt, sparse_pt, z_pt])
+    traces.extend([line])
+    if ent_markers is not None:
+        traces.append(ent_markers)
+    traces.extend([soft_pt, sparse_pt, z_pt])
     label_pos = axis_max - 0.02 * (axis_max - axis_min)
-    annotations = [dict(x=label_pos, y=0, z=0, text='z₁', showarrow=False, font=dict(family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif", size=16, color='#111')), dict(x=0, y=label_pos, z=0, text='z₂', showarrow=False, font=dict(family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif", size=16, color='#111')), dict(x=0, y=0, z=label_pos, text='z₃', showarrow=False, font=dict(family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif", size=16, color='#111'))]
-    layout = go.Layout(margin=dict(l=0, r=0, t=0, b=0), scene=dict(xaxis=dict(title='', range=[axis_min, axis_max], backgroundcolor='#ffffff', showticklabels=False, ticks='', tickvals=[], ticktext=[], showgrid=False), yaxis=dict(title='', range=[axis_min, axis_max], backgroundcolor='#ffffff', showticklabels=False, ticks='', tickvals=[], ticktext=[], showgrid=False), zaxis=dict(title='', range=[axis_min, axis_max], backgroundcolor='#ffffff', showticklabels=False, ticks='', tickvals=[], ticktext=[], showgrid=False), aspectmode='cube', camera=dict(eye=dict(x=1.6, y=1.6, z=0.8)), annotations=annotations), legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.7)', borderwidth=0), font=dict(family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif", size=14, color='#111'))
+    annotations = [
+        dict(
+            x=label_pos,
+            y=0,
+            z=0,
+            text='z₁',
+            showarrow=False,
+            font=dict(
+                family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif",
+                size=16,
+                color='#111',
+            ),
+        ),
+        dict(
+            x=0,
+            y=label_pos,
+            z=0,
+            text='z₂',
+            showarrow=False,
+            font=dict(
+                family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif",
+                size=16,
+                color='#111',
+            ),
+        ),
+        dict(
+            x=0,
+            y=0,
+            z=label_pos,
+            text='z₃',
+            showarrow=False,
+            font=dict(
+                family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif",
+                size=16,
+                color='#111',
+            ),
+        ),
+    ]
+    # Preserve user camera/zoom between updates via uirevision
+    layout = go.Layout(
+        margin=dict(l=0, r=0, t=0, b=0),
+        scene=dict(
+            xaxis=dict(title='', range=[axis_min, axis_max], backgroundcolor='#ffffff', showticklabels=False, ticks='', tickvals=[], ticktext=[], showgrid=False),
+            yaxis=dict(title='', range=[axis_min, axis_max], backgroundcolor='#ffffff', showticklabels=False, ticks='', tickvals=[], ticktext=[], showgrid=False),
+            zaxis=dict(title='', range=[axis_min, axis_max], backgroundcolor='#ffffff', showticklabels=False, ticks='', tickvals=[], ticktext=[], showgrid=False),
+            aspectmode='cube',
+            camera=dict(eye=dict(x=1.6, y=1.6, z=0.8)),
+            uirevision='keep-camera',
+            annotations=annotations,
+        ),
+        uirevision='keep-camera',
+        legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.7)', borderwidth=0),
+        font=dict(family="'Computer Modern', 'Latin Modern Roman', 'Times New Roman', serif", size=14, color='#111')
+    )
     return go.Figure(data=traces, layout=layout)
 
 def fmt_float(v: float) -> str:

@@ -37,3 +37,69 @@ def sparsemax(logits: np.ndarray) -> np.ndarray:
     flat = logits.reshape(-1, 3)
     out = _sparsemax_3d_batch(flat)
     return out.reshape(orig_shape)
+
+def entmax_alpha(logits: np.ndarray, alpha: float, n_iter: int = 50, tol: float = 1e-8) -> np.ndarray:
+    """
+    Compute the alpha-entmax mapping for 3D logits.
+
+    For alpha=1 it reduces to softmax; for alpha=2 it reduces to sparsemax.
+    For 1 < alpha < 2, it solves for tau via bisection such that
+        sum((z_i - tau)_+ ** (1/(alpha-1))) = 1
+    and returns p_i = ((z_i - tau)_+) ** (1/(alpha-1)).
+    The result is normalized to sum to 1 for numerical stability.
+    """
+    logits = np.asarray(logits, dtype=float)
+    if logits.shape[-1] != 3:
+        raise ValueError('entmax_alpha expects last dimension of size 3')
+    if alpha <= 0:
+        raise ValueError('alpha must be positive')
+    if np.isclose(alpha, 1.0):
+        return softmax(logits)
+    if np.isclose(alpha, 2.0):
+        return sparsemax(logits)
+    if not (1.0 < alpha < 2.0):
+        raise ValueError('alpha-entmax supported for 1 < alpha < 2 (or exactly 1, 2)')
+
+    power = 1.0 / (alpha - 1.0)
+    orig_shape = logits.shape
+    flat = logits.reshape(-1, 3)
+    out = np.empty_like(flat)
+
+    for i in range(flat.shape[0]):
+        z = flat[i]
+        # Bracket tau so that S(lo) > 1 and S(hi) < 1
+        z_min = float(np.min(z))
+        z_max = float(np.max(z))
+        lo = z_min - 10.0
+        hi = z_max
+        # Ensure the lower bound yields S>1
+        def S(tau: float) -> float:
+            return float(np.sum(np.clip(z - tau, 0.0, None) ** power))
+        # Expand lower bound if needed (very rare with the chosen offset)
+        s_lo = S(lo)
+        attempts = 0
+        while s_lo <= 1.0 and attempts < 10:
+            lo -= 10.0
+            s_lo = S(lo)
+            attempts += 1
+
+        # Bisection to find tau
+        for _ in range(n_iter):
+            mid = 0.5 * (lo + hi)
+            s_mid = S(mid)
+            if s_mid > 1.0:
+                lo = mid
+            else:
+                hi = mid
+            if (hi - lo) < tol:
+                break
+        tau = hi
+        p = np.clip(z - tau, 0.0, None) ** power
+        sum_p = float(np.sum(p))
+        if sum_p > 0.0:
+            p = p / sum_p
+        # Clean very small values to exact zero for display stability
+        p[np.isclose(p, 0.0, atol=1e-12)] = 0.0
+        out[i] = p
+
+    return out.reshape(orig_shape)

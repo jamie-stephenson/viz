@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 maxvis = "apps.maxvis.app:main"
+hardconcrete = "apps.hardconcrete.app:main"
 
 [build-system]
 requires = ["setuptools>=61"]
