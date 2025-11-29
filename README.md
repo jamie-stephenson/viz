@@ -1,4 +1,4 @@
-# Small Interactive Math Visualizations
+# Small Interactive Visualizations
 
 A collection of small vibe-coded visualizations. Each visualization lives in its own subdirectory under `apps/` and can be run via `uv run <name>`.
 
