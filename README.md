@@ -5,6 +5,7 @@ A collection of small vibe-coded visualizations. Each visualization lives in its
 Currently included
 - `maxvis`: Softmax vs Sparsemax in 3D — adjust a 3D logit vector and see softmax(z) and sparsemax(z) on the probability simplex, with the raw z point in 3D.
 - `hardconcrete`: HardConcrete gate sampling — interactively explore the stages (u, s, z̄, z) with a slider over log(alpha) and see distributions update live.
+ - `strong_convex_stability`: Convex ERM stability — side-by-side plots of unregularized vs ℓ₂-regularized empirical risk; adjust λ and see minimizers and pointwise-loss verticals.
 
 Run with uv
 - `uv run [VISUALISATION]`

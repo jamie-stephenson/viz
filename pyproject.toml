@@ -13,6 +13,7 @@ dependencies = [
 [project.scripts]
 maxvis = "apps.maxvis.app:main"
 hardconcrete = "apps.hardconcrete.app:main"
+strong_convex_stability = "apps.strong_convex_stability.app:main"
 
 [build-system]
 requires = ["setuptools>=61"]
